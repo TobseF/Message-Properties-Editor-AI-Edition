@@ -1,13 +1,13 @@
 <!-- Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.-->
 <idea-plugin>
-    <id>github.beansoft.properties.bundle.editor.fork</id>
-    <name>Resource Bundle Editor Fork</name>
+    <id>github.tobsef.message.properties.editor.ai</id>
+    <name>Message Properties Editor AI Edition</name>
     <category>Languages</category>
     <depends>com.intellij.modules.xml</depends>
     <description>
-        Provides dedicated editor for .properties bundles.
+        Provides dedicated editor for .properties bundles and AI translations (bring your own API-Key).
     </description>
-    <vendor email="beansoft@126.com" url="https://github.com/beansoft/properties-resource-bundle-editor-fork">BeanSoft
+    <vendor email="public.tobse@gmail.com" url="https://github.com/TobseF/Message-Properties-Editor-AI-Edition">TobseF
     </vendor>
 
     <depends>com.intellij.properties</depends>

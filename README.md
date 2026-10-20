@@ -1,4 +1,4 @@
-# Resource Bundle Editor Fork
+# Message Properties Editor AI Edition
 
 > **Why this fork?** JetBrains decided to drop the built-in Resource Bundle Editor and move it to obsolete plugins
 > (see [IDEA-379833](https://youtrack.jetbrains.com/issue/IDEA-379833/Move-Resource-Bundle-editor-to-obsolete-plugins)).
@@ -8,7 +8,7 @@ An IntelliJ IDEA plugin that provides a dedicated split-pane editor for Java `.p
 When your project has multiple locale files sharing the same base name (e.g. `messages.properties`, `messages_en.properties`, `messages_fr.properties`), the plugin lets you view and edit all translations for each property key side-by-side.
 
 
-**Plugin ID:** `github.beansoft.properties.bundle.editor.fork`
+**Plugin ID:** `github.tobsef.message.properties.editor.ai`
 
 ---
 
@@ -16,6 +16,7 @@ When your project has multiple locale files sharing the same base name (e.g. `me
 
 - **Side-by-side translation editing** – Select a property key and see/edit its value in every locale at once
 - **Structure View tree** – Hierarchical view of property keys with grouping by prefix separator
+- **AI translation** – Generate missing translations for the selected key, or for the whole bundle at once, via any OpenAI compatible endpoint (see below)
 - **Incomplete property inspection** – Highlights keys missing translations in one or more locales (severity: ERROR)
 - **Unused property detection** – Integrates with IntelliJ's unused property inspection
 - **Quick fixes** – Ignore specific locales, remove unused properties from all locales
@@ -24,7 +25,6 @@ When your project has multiple locale files sharing the same base name (e.g. `me
 - **Add new property** – Insert a new key with optional positional placement
 - **Propagate value** – Copy a value across all locale files from the context menu
 - **Show only incomplete** – Filter the tree to show only untranslated properties
-- **AI translation** – Generate missing translations for the selected key, or for the whole bundle at once, via any OpenAI compatible endpoint (see below)
 - **Clear translation** – A "x" button next to every translation field removes that translation
 
 ### AI Translation
@@ -72,7 +72,7 @@ The source text is taken from the main language file if it has a value, otherwis
 ### Clone & Build
 
 ```bash
-git clone https://github.com/beansoft/properties-resource-bundle-editor-fork.git
+git clone https://github.com/TobseF/Message-Properties-Editor-AI-Edition.git
 cd properties-resource-bundle-editor-fork
 
 # Build the plugin (compiles, runs tests, and packages the plugin ZIP)
@@ -268,7 +268,7 @@ Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Source code:** [github.com/beansoft/properties-resource-bundle-editor-fork](https://github.com/beansoft/properties-resource-bundle-editor-fork)
+- **Source code:** [github.com/TobseF/Message-Properties-Editor-AI-Edition](https://github.com/TobseF/Message-Properties-Editor-AI-Edition)
 - **JetBrains Marketplace:** [plugins.jetbrains.com](https://plugins.jetbrains.com/) (search "Resource Bundle Editor Fork")
 - **IntelliJ Platform Plugin SDK:** [plugins.jetbrains.com/docs/intellij](https://plugins.jetbrains.com/docs/intellij/welcome.html)
 - **Plugin Signing Guide:** [plugins.jetbrains.com/docs/intellij/plugin-signing.html](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html)

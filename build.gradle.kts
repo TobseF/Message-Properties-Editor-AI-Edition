@@ -10,8 +10,8 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.13.1"
 }
 
-group = "github.beansoft.properties.bundle.editor.fork"
-version = "2026.1.0"
+group = "github.tobsef.resource.bundle.editor.ai"
+version = "2026.1.1"
 
 repositories {
     mavenCentral()
