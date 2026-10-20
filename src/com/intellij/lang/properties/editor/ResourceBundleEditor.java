@@ -178,7 +178,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
         if (selectedProperty != null && e.getOldLeadSelectionPath() != null) {
           for (Map.Entry<VirtualFile, EditorEx> entry : myEditors.entrySet()) {
             if (entry.getValue() == mySelectedEditor) {
-              writeEditorPropertyValue(selectedProperty.getName(), mySelectedEditor, entry.getKey());
+              writeEditorPropertyValue(ReadAction.compute(() -> selectedProperty.getName()), mySelectedEditor, entry.getKey());
               break;
             }
           }
@@ -192,11 +192,13 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
         if (oldSelected == null || newSelected == null) {
           return false;
         }
-        final PsiElement oldPsiElement = oldSelected.getPsiElement();
-        if (!oldPsiElement.isValid()) {
-          return false;
-        }
-        return oldPsiElement.isEquivalentTo(newSelected.getPsiElement());
+        return ReadAction.compute(() -> {
+          final PsiElement oldPsiElement = oldSelected.getPsiElement();
+          if (!oldPsiElement.isValid()) {
+            return false;
+          }
+          return oldPsiElement.isEquivalentTo(newSelected.getPsiElement());
+        });
       }
     });
 
@@ -207,9 +209,11 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     TreeElement[] children = myStructureViewComponent.getTreeModel().getRoot().getChildren();
     if (children.length != 0) {
       TreeElement child = children[0];
-      IProperty property = ((PropertyStructureViewElement)child).getProperty();
-      if (property != null) {
-        String propName = property.getUnescapedKey();
+      String propName = ReadAction.compute(() -> {
+        IProperty property = ((PropertyStructureViewElement)child).getProperty();
+        return property == null ? null : property.getUnescapedKey();
+      });
+      if (propName != null) {
         setState(new ResourceBundleEditorState(propName));
       }
     }
@@ -490,11 +494,14 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
 
     while (!toCheck.isEmpty()) {
       TreeElement element = toCheck.pop();
-      PsiElement value = element instanceof PropertyStructureViewElement
-                     ? ((PropertyStructureViewElement)element).getPsiElement()
-                     : null;
-      final IProperty property = PropertiesImplUtil.getProperty(value);
-      if (property != null && propertyName.equals(property.getUnescapedKey())) {
+      final IProperty property = ReadAction.compute(() -> {
+        PsiElement value = element instanceof PropertyStructureViewElement
+                           ? ((PropertyStructureViewElement)element).getPsiElement()
+                           : null;
+        IProperty candidate = PropertiesImplUtil.getProperty(value);
+        return candidate != null && propertyName.equals(candidate.getUnescapedKey()) ? candidate : null;
+      });
+      if (property != null) {
         myStructureViewComponent.select(property, true);
         selectionChanged();
         return;
@@ -803,8 +810,10 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
   }
 
   private @Nullable String getSelectedPropertyName() {
-    final IProperty selectedProperty = getSelectedProperty();
-    return selectedProperty == null ? null : selectedProperty.getName();
+    return ReadAction.compute(() -> {
+      final IProperty selectedProperty = getSelectedProperty();
+      return selectedProperty == null ? null : selectedProperty.getName();
+    });
   }
 
   public @Nullable IProperty getSelectedProperty() {
@@ -814,7 +823,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
       .filter(ResourceBundleEditorViewElement.class)
       .first();
     return first instanceof PropertyStructureViewElement ?
-           ((PropertyStructureViewElement)first).getProperty() : null;
+           ReadAction.compute(() -> ((PropertyStructureViewElement)first).getProperty()) : null;
   }
 
   public @NotNull @Unmodifiable Collection<ResourceBundleEditorViewElement> getSelectedElements() {
@@ -852,7 +861,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     final boolean isAlphaSorted = myStructureViewComponent.isActionActive(Sorter.getAlphaSorterId());
     List<String> keysOrder = isAlphaSorted ? ContainerUtil.sorted(propertyKeys) : new ArrayList<>(propertyKeys);
 
-    final String currentKey = selectedProperty.getKey();
+    final String currentKey = ReadAction.compute(() -> selectedProperty.getKey());
     final int idx = keysOrder.indexOf(currentKey);
     LOG.assertTrue(idx != -1);
     final IncompletePropertyInspection incompletePropertyInspection =
