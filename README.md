@@ -1,14 +1,17 @@
-# Message Properties Editor AI Edition
+# <img alt="SVGPaw" src="docs/icon.svg" height="48"/> Message Properties Editor AI Edition
 
 > **Why this fork?** JetBrains decided to drop the built-in Resource Bundle Editor and move it to obsolete plugins
 > (see [IDEA-379833](https://youtrack.jetbrains.com/issue/IDEA-379833/Move-Resource-Bundle-editor-to-obsolete-plugins)).
-> This repository continues active development and maintenance of the plugin so the community can keep using it on the latest IntelliJ Platform versions.
+> This repository continues active development and adds additional features like AI based translations.
 
 An IntelliJ IDEA plugin that provides a dedicated split-pane editor for Java `.properties` resource bundles (i18n).  
 When your project has multiple locale files sharing the same base name (e.g. `messages.properties`, `messages_en.properties`, `messages_fr.properties`), the plugin lets you view and edit all translations for each property key side-by-side.
 
 
 **Plugin ID:** `github.tobsef.message.properties.editor.ai`
+
+![screenshot_editor_1.png](docs/screenshot_editor_1.png)
+![screenshot_settings.png](docs/screenshot_settings.png)
 
 ---
 
