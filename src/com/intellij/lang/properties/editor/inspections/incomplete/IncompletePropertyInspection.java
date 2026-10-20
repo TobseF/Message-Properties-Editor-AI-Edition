@@ -37,7 +37,7 @@ import java.util.function.Function;
  */
 public final class IncompletePropertyInspection extends LocalInspectionTool implements UnfairLocalInspectionTool {
   private static final @NonNls String SUFFIXES_TAG_NAME = "suffixes";
-  public static final String TOOL_KEY = "IncompleteProperty";
+  public static final String TOOL_KEY = "IncompletePropertyBundleEditor";
 
   private final SortedSet<String> mySuffixes = new TreeSet<>();
 

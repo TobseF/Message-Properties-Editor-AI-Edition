@@ -16,7 +16,7 @@
         <renameHandler
                 implementation="com.intellij.lang.properties.refactoring.rename.ResourceBundleFromEditorRenameHandler"/>
 
-        <localInspection language="Properties" shortName="IncompleteProperty" unfair="true"
+        <localInspection language="Properties" shortName="IncompletePropertyBundleEditor" unfair="true"
                          bundle="messages.ResourceBundleEditorBundle"
                          key="incomplete.property.inspection.display.name"
                          groupKey="properties.files.inspection.group.display.name"

@@ -1,7 +1,7 @@
 {
   "inspections": [
     {
-      "id": "IncompleteProperty",
+      "id": "IncompletePropertyBundleEditor",
       "codeQualityCategory": "Reliability"
     }
   ]
