@@ -1,25 +1,38 @@
 # <img alt="SVGPaw" src="docs/icon.svg" height="48"/> Message Properties Editor AI Edition
 
-> **Why this fork?** JetBrains decided to drop the built-in Resource Bundle Editor and move it to obsolete plugins
-> (see [IDEA-379833](https://youtrack.jetbrains.com/issue/IDEA-379833/Move-Resource-Bundle-editor-to-obsolete-plugins)).
-> This repository continues active development and adds additional features like AI based translations.
+**The Resource Bundle Editor you know, now with AI translations built in.**
 
-An IntelliJ IDEA plugin that provides a dedicated split-pane editor for Java `.properties` resource bundles (i18n).  
-When your project has multiple locale files sharing the same base name (e.g. `messages.properties`, `messages_en.properties`, `messages_fr.properties`), the plugin lets you view and edit all translations for each property key side-by-side.
+Stop copying keys between `messages_de.properties`, `messages_fr.properties` and five more files by hand.
+Open the bundle, see every locale side by side, and fill the gaps with one click.
 
-
-**Plugin ID:** `github.tobsef.message.properties.editor.ai`
+- 🔑 **Bring your own key**: any OpenAI-compatible endpoint, any model
+- 🔌 **Works offline**: run local models with LM Studio, so your strings never leave your machine
+- 🚫 **No vendor login**: no account, no subscription, no lock-in
+- 🔋 **Batteries included**: everything the original JetBrains editor can do, plus more
 
 ![screenshot_editor_1.png](docs/screenshot_editor_1.png)
-![screenshot_settings.png](docs/screenshot_settings.png)
+
+> **Why this fork?** JetBrains is dropping the built-in Resource Bundle Editor and moving it to the obsolete plugins
+> (see [IDEA-379833](https://youtrack.jetbrains.com/issue/IDEA-379833/Move-Resource-Bundle-editor-to-obsolete-plugins)).
+> This project keeps it alive, keeps it maintained and keeps adding features.
+
+**Plugin ID:** `github.tobsef.message.properties.editor.ai`
 
 ---
 
 ## Features
 
+### ✨ New in the AI Edition
+
+- **AI translation**: translate missing values for the selected key, or for the whole bundle at once
+- **Your model, your rules**: OpenAI, NanoGPT, LM Studio or any custom OpenAI-compatible server (see below)
+- **Safe by design**: placeholders like `{0}` and `%s` are kept, and every run can be undone in one step
+- **Clear translation**: an "x" button next to every translation field removes that translation
+
+### 🧰 Everything from the original editor
+
 - **Side-by-side translation editing** – Select a property key and see/edit its value in every locale at once
 - **Structure View tree** – Hierarchical view of property keys with grouping by prefix separator
-- **AI translation** – Generate missing translations for the selected key, or for the whole bundle at once, via any OpenAI compatible endpoint (see below)
 - **Incomplete property inspection** – Highlights keys missing translations in one or more locales (severity: ERROR)
 - **Unused property detection** – Integrates with IntelliJ's unused property inspection
 - **Quick fixes** – Ignore specific locales, remove unused properties from all locales
@@ -28,9 +41,10 @@ When your project has multiple locale files sharing the same base name (e.g. `me
 - **Add new property** – Insert a new key with optional positional placement
 - **Propagate value** – Copy a value across all locale files from the context menu
 - **Show only incomplete** – Filter the tree to show only untranslated properties
-- **Clear translation** – A "x" button next to every translation field removes that translation
 
-### AI Translation
+### 🤖 AI Translation Setup
+
+![screenshot_settings.png](docs/screenshot_settings.png)
 
 Configure the endpoint under **Settings → Tools → Resource Bundle Editor AI Translation**:
 

@@ -4,9 +4,37 @@
     <name>Message Properties Editor AI Edition</name>
     <category>Languages</category>
     <depends>com.intellij.modules.xml</depends>
-    <description>
-        Provides dedicated editor for .properties bundles and AI translations (bring your own API-Key).
-    </description>
+    <description><![CDATA[
+        <p>
+        The split-pane editor for Java <code>.properties</code> resource bundles, now with <b>AI translations</b>.
+        It has all the features of the original JetBrains <i>Resource Bundle Editor</i>, plus extras that
+        come built in, such as automatic translation.
+        </p>
+
+        <h3>AI translation, your way</h3>
+        <ul>
+          <li><b>Bring your own key</b>: works with any OpenAI-compatible endpoint (OpenAI, NanoGPT, custom servers)</li>
+          <li><b>Any model</b>: pick from the list the server returns, or enter one yourself</li>
+          <li><b>Runs fully offline</b> with local models, e.g. LM Studio, so no data leaves your machine</li>
+          <li><b>No vendor login</b>, no subscription, no account needed</li>
+          <li>Translate missing values for a single key or for the <b>whole bundle</b> at once; placeholders like <code>{0}</code> or <code>%s</code> are kept, and every run can be undone in one step</li>
+        </ul>
+
+        <h3>Everything you know from the Resource Bundle Editor</h3>
+        <ul>
+          <li>Edit all locales of a key side by side</li>
+          <li>Key tree in the Structure View, grouped by prefix</li>
+          <li>Inspections for missing translations and unused keys, with quick fixes</li>
+          <li>Rename keys, prefix groups and bundles; add new keys; copy a value to all locales</li>
+          <li>Filter for incomplete keys and jump between locale files</li>
+        </ul>
+
+        <p><img src="https://raw.githubusercontent.com/TobseF/Message-Properties-Editor-AI-Edition/main/docs/screenshot_editor_1.png" alt="Resource bundle editor" width="800"/></p>
+        <p><img src="https://raw.githubusercontent.com/TobseF/Message-Properties-Editor-AI-Edition/main/docs/screenshot_settings.png" alt="AI translation settings" width="800"/></p>
+
+        <p>JetBrains moved the built-in Resource Bundle Editor to the obsolete plugins
+        (<a href="https://youtrack.jetbrains.com/issue/IDEA-379833">IDEA-379833</a>). This plugin carries it forward.</p>
+    ]]></description>
     <vendor email="public.tobse@gmail.com" url="https://github.com/TobseF/Message-Properties-Editor-AI-Edition">TobseF
     </vendor>
 
