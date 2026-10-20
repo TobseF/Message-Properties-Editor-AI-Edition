@@ -3,6 +3,7 @@ package com.intellij.lang.properties.editor;
 
 import com.intellij.codeHighlighting.BackgroundEditorHighlighter;
 import com.intellij.codeInsight.FileModificationService;
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.FileSelectInContext;
 import com.intellij.ide.SelectInContext;
 import com.intellij.ide.structureView.newStructureView.StructureViewComponent;
@@ -14,7 +15,20 @@ import com.intellij.lang.properties.IProperty;
 import com.intellij.lang.properties.PropertiesImplUtil;
 import com.intellij.lang.properties.PropertiesUtil;
 import com.intellij.lang.properties.ResourceBundle;
+import com.intellij.lang.properties.editor.ai.AiTranslationClient;
+import com.intellij.lang.properties.editor.ai.AiTranslationConfigurable;
+import com.intellij.lang.properties.editor.ai.AiTranslationPlan;
+import com.intellij.lang.properties.editor.ai.AiTranslationSettings;
+import com.intellij.lang.properties.editor.ai.AiTranslator;
+import com.intellij.lang.properties.editor.ai.OpenAiSettingsAction;
+import com.intellij.lang.properties.editor.ai.TranslateMissingAction;
+import com.intellij.lang.properties.editor.ai.TranslateAllMissingAction;
 import com.intellij.lang.properties.editor.inspections.incomplete.IncompletePropertyInspection;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.options.ShowSettingsUtil;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.lang.properties.psi.PropertiesFile;
 import com.intellij.lang.properties.psi.PropertiesResourceBundleUtil;
 import com.intellij.lang.properties.xml.XmlPropertiesFile;
@@ -77,6 +91,12 @@ import java.beans.PropertyChangeListener;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class ResourceBundleEditor extends UserDataHolderBase implements DocumentsEditor {
   private static final Logger LOG = Logger.getInstance(ResourceBundleEditor.class);
@@ -115,7 +135,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     myStructureViewPanel = new JPanel();
     JBSplitter splitter = new OnePixelSplitter(false);
     splitter.setFirstComponent(myStructureViewPanel);
-    splitter.setSecondComponent(myValuesPanel);
+    splitter.setSecondComponent(createValuesPanelWithToolbar());
     splitter.setShowDividerControls(true);
     splitter.setHonorComponentsMinimumSize(true);
     splitter.setAndLoadSplitterProportionKey(getClass() + ".splitter");
@@ -204,6 +224,184 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
       }
     });
     myHighlighter = myResourceBundle.getDefaultPropertiesFile() instanceof XmlPropertiesFile ? null : new ResourceBundleEditorHighlighter(this);
+  }
+
+  private @NotNull JComponent createValuesPanelWithToolbar() {
+    DefaultActionGroup group = new DefaultActionGroup();
+    group.add(new TranslateMissingAction(this));
+    group.add(new TranslateAllMissingAction(this));
+    group.add(new OpenAiSettingsAction(myProject));
+    ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar("ResourceBundleEditorAi", group, true);
+    JPanel wrapper = new JPanel(new BorderLayout());
+    toolbar.setTargetComponent(wrapper);
+    wrapper.add(toolbar.getComponent(), BorderLayout.NORTH);
+    wrapper.add(myValuesPanel, BorderLayout.CENTER);
+    return wrapper;
+  }
+
+  /**
+   * Generates the translations that are missing for the selected property key using the configured AI endpoint
+   * and stores them in the corresponding properties files.
+   */
+  public void translateMissingTranslations() {
+    AiTranslationSettings settings = AiTranslationSettings.getInstance();
+    if (!ensureAiConfigured(settings)) return;
+    final String key = getSelectedPropertyName();
+    if (key == null) return;
+    flushSelectedEditor(key);
+
+    final AiTranslationPlan plan = ReadAction.compute(() -> AiTranslationPlan.build(myResourceBundle, key, settings.getMainLanguage()));
+    if (plan == null) {
+      Messages.showInfoMessage(myProject, ResourceBundleEditorBundle.message("ai.translate.no.source.message", key),
+                               ResourceBundleEditorBundle.message("ai.translate.title"));
+      return;
+    }
+    if (plan.getTargets().isEmpty()) {
+      Messages.showInfoMessage(myProject, ResourceBundleEditorBundle.message("ai.translate.nothing.missing.message", key),
+                               ResourceBundleEditorBundle.message("ai.translate.title"));
+      return;
+    }
+
+    runTranslation(settings, List.of(plan));
+  }
+
+  /** Generates all missing translations of every property key of the bundle. */
+  public void translateAllMissingTranslations() {
+    AiTranslationSettings settings = AiTranslationSettings.getInstance();
+    if (!ensureAiConfigured(settings)) return;
+    flushSelectedEditor(getSelectedPropertyName());
+
+    final List<AiTranslationPlan> plans = ReadAction.compute(() -> {
+      List<AiTranslationPlan> result = new ArrayList<>();
+      for (String key : ResourceBundleFileStructureViewElement.getPropertiesMap(myResourceBundle, false).keySet()) {
+        AiTranslationPlan plan = AiTranslationPlan.build(myResourceBundle, key, settings.getMainLanguage());
+        if (plan != null && !plan.getTargets().isEmpty()) result.add(plan);
+      }
+      return result;
+    });
+    int requests = plans.stream().mapToInt(p -> p.getTargets().size()).sum();
+    if (requests == 0) {
+      Messages.showInfoMessage(myProject, ResourceBundleEditorBundle.message("ai.translate.bundle.nothing.missing.message"),
+                               ResourceBundleEditorBundle.message("ai.translate.title"));
+      return;
+    }
+    if (Messages.showOkCancelDialog(myProject,
+                                    ResourceBundleEditorBundle.message("ai.translate.bundle.confirm.message", plans.size(), requests),
+                                    ResourceBundleEditorBundle.message("ai.translate.title"),
+                                    ResourceBundleEditorBundle.message("ai.translate.bundle.confirm.ok"),
+                                    Messages.getCancelButton(), Messages.getQuestionIcon()) != Messages.OK) {
+      return;
+    }
+    runTranslation(settings, plans);
+  }
+
+  private boolean ensureAiConfigured(@NotNull AiTranslationSettings settings) {
+    if (settings.isConfigured()) return true;
+    if (Messages.showOkCancelDialog(myProject,
+                                    ResourceBundleEditorBundle.message("ai.translate.not.configured.message"),
+                                    ResourceBundleEditorBundle.message("ai.translate.title"),
+                                    ResourceBundleEditorBundle.message("ai.translate.open.settings"),
+                                    Messages.getCancelButton(), Messages.getInformationIcon()) == Messages.OK) {
+      ShowSettingsUtil.getInstance().showSettingsDialog(myProject, AiTranslationConfigurable.class);
+    }
+    return false;
+  }
+
+  /** Makes sure edits that are still only in the focused text field are taken into account. */
+  private void flushSelectedEditor(@Nullable String key) {
+    if (key == null || mySelectedEditor == null || mySelectedEditor.isViewer()) return;
+    for (Map.Entry<VirtualFile, EditorEx> entry : myEditors.entrySet()) {
+      if (entry.getValue() == mySelectedEditor) {
+        writeEditorPropertyValue(key, mySelectedEditor, entry.getKey());
+        break;
+      }
+    }
+  }
+
+  private record TranslatedValue(@NotNull String key, @NotNull PropertiesFile file, @NotNull String text) {}
+
+  private void runTranslation(@NotNull AiTranslationSettings settings, @NotNull List<AiTranslationPlan> plans) {
+    final String extraInstructions = settings.getExtraInstructions();
+    final int total = plans.stream().mapToInt(p -> p.getTargets().size()).sum();
+    final String title = plans.size() == 1
+                         ? ResourceBundleEditorBundle.message("ai.translate.progress.title", plans.get(0).getKey())
+                         : ResourceBundleEditorBundle.message("ai.translate.progress.bundle.title");
+    new Task.Backgroundable(myProject, title, true) {
+      private final List<TranslatedValue> myResults = new ArrayList<>();
+      private String myError;
+
+      @Override
+      public void run(@NotNull ProgressIndicator indicator) {
+        AiTranslationClient.Config config = settings.toClientConfig();
+        ExecutorService pool = Executors.newFixedThreadPool(Math.min(settings.getParallelRequests(), total));
+        List<Future<TranslatedValue>> futures = new ArrayList<>();
+        try {
+          for (AiTranslationPlan plan : plans) {
+            for (AiTranslationPlan.Target target : plan.getTargets()) {
+              futures.add(pool.submit(() -> new TranslatedValue(plan.getKey(), target.file(),
+                                                                AiTranslator.translate(config, plan, target, extraInstructions))));
+            }
+          }
+          int done = 0;
+          for (Future<TranslatedValue> future : futures) {
+            while (true) {
+              indicator.checkCanceled();
+              try {
+                future.get(200, TimeUnit.MILLISECONDS);
+                break;
+              }
+              catch (TimeoutException ignored) {
+              }
+              catch (ExecutionException e) {
+                myError = e.getCause() == null ? String.valueOf(e) : e.getCause().getMessage();
+                return;
+              }
+              catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+              }
+            }
+            indicator.setFraction((double)++done / total);
+            indicator.setText(ResourceBundleEditorBundle.message("ai.translate.progress.count", done, total));
+          }
+        }
+        finally {
+          // stop what is still queued or running, but keep everything that already finished
+          pool.shutdownNow();
+          for (Future<TranslatedValue> future : futures) {
+            if (future.isDone() && !future.isCancelled()) {
+              try {
+                myResults.add(future.get());
+              }
+              catch (Exception ignored) {
+              }
+            }
+          }
+        }
+      }
+
+      @Override
+      public void onFinished() {
+        // also runs after cancellation / failure, so translations received so far are not lost
+        applyTranslations(myResults);
+        if (myError != null) {
+          Messages.showErrorDialog(myProject, ResourceBundleEditorBundle.message("ai.translate.failed.message", myError),
+                                   ResourceBundleEditorBundle.message("ai.translate.title"));
+        }
+      }
+    }.queue();
+  }
+
+  private void applyTranslations(@NotNull List<TranslatedValue> translations) {
+    if (translations.isEmpty() || !isValid() || !myResourceBundle.isValid()) return;
+    PsiFile[] filesToPrepare = translations.stream().map(t -> t.file().getContainingFile()).distinct().toArray(PsiFile[]::new);
+    if (!FileModificationService.getInstance().preparePsiElementsForWrite(filesToPrepare)) return;
+    WriteCommandAction.runWriteCommandAction(myProject, ResourceBundleEditorBundle.message("ai.translate.command.name"), null, () -> {
+      for (TranslatedValue t : translations) {
+        myPropertiesInsertDeleteManager.insertOrUpdateTranslation(t.key(), t.text(), t.file());
+      }
+    });
+    updateEditorsFromProperties(false);
   }
 
   @Override
@@ -376,6 +574,28 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     }));
   }
 
+  /**
+   * Removes the translation of the selected property from the given file. In the default file the value is only emptied,
+   * because deleting the key there would remove the property from the whole bundle.
+   */
+  private void clearTranslation(final @NotNull PropertiesFile propertiesFile, final @NotNull Editor editor) {
+    final String key = getSelectedPropertyName();
+    if (key == null || !propertiesFile.getContainingFile().isValid()) return;
+    final VirtualFile file = propertiesFile.getVirtualFile();
+    if (!FileModificationService.getInstance().prepareVirtualFilesForWrite(myProject, Collections.singleton(file))) return;
+    // otherwise the focus-lost handler would write the old / empty text back
+    if (mySelectedEditor == editor) mySelectedEditor = null;
+    WriteCommandAction.runWriteCommandAction(myProject, ResourceBundleEditorBundle.message("clear.translation.command.name"), null, () -> {
+      if (file.equals(myResourceBundle.getDefaultPropertiesFile().getVirtualFile())) {
+        myPropertiesInsertDeleteManager.insertOrUpdateTranslation(key, "", propertiesFile);
+      }
+      else {
+        myPropertiesInsertDeleteManager.deletePropertyIfExist(key, propertiesFile);
+      }
+    });
+    updateEditorsFromProperties(false);
+  }
+
   void recreateEditorsPanel() {
     if (!myProject.isOpen() || myDisposed) return;
 
@@ -458,6 +678,13 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
         }
       };
       comp.add(editor.getComponent(), BorderLayout.CENTER);
+      InplaceButton clearButton = new InplaceButton(ResourceBundleEditorBundle.message("clear.translation.tooltip"),
+                                                    AllIcons.Actions.Close,
+                                                    e -> clearTranslation(propertiesFile, editor));
+      JPanel clearButtonPanel = new JPanel(new BorderLayout());
+      clearButtonPanel.setBorder(JBUI.Borders.empty(2, 4, 0, 0));
+      clearButtonPanel.add(clearButton, BorderLayout.NORTH);
+      comp.add(clearButtonPanel, BorderLayout.EAST);
       comp.setBorder(IdeBorderFactory.createTitledBorder(title, false));
       myTitledPanels.put(propertiesFile.getVirtualFile(), comp);
 
@@ -580,8 +807,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     return selectedProperty == null ? null : selectedProperty.getName();
   }
 
-  @Nullable
-  IProperty getSelectedProperty() {
+  public @Nullable IProperty getSelectedProperty() {
     ResourceBundleEditorViewElement first = getSelectedNodes()
       .filter(AbstractTreeNode.class)
       .filterMap(AbstractTreeNode::getValue)
@@ -805,6 +1031,8 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
         group.add(CustomActionsSchema.getInstance().getCorrectedAction(IdeActions.GROUP_CUT_COPY_PASTE));
         group.add(CustomActionsSchema.getInstance().getCorrectedAction(IdeActions.ACTION_EDIT_SOURCE));
         group.addSeparator();
+        group.add(new TranslateMissingAction(ResourceBundleEditor.this));
+        group.add(new TranslateAllMissingAction(ResourceBundleEditor.this));
         group.add(new AnAction(ResourceBundleEditorBundle.messagePointer("action.PropagateValue.text")) {
           @Override
           public void actionPerformed(@NotNull AnActionEvent e) {

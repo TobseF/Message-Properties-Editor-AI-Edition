@@ -23,6 +23,10 @@
                          enabledByDefault="true" level="ERROR"
                          implementationClass="com.intellij.lang.properties.editor.inspections.incomplete.IncompletePropertyInspection"/>
 
+        <applicationConfigurable parentId="tools" id="ResourceBundleEditor.AiTranslation"
+                                 bundle="messages.ResourceBundleEditorBundle" key="ai.settings.display.name"
+                                 instance="com.intellij.lang.properties.editor.ai.AiTranslationConfigurable"/>
+
         <fileEditorProvider id="ResourceBundle"
                             implementation="com.intellij.lang.properties.editor.ResourceBundleEditorProvider"/>
 

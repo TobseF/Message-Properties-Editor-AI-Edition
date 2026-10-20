@@ -24,6 +24,31 @@ When your project has multiple locale files sharing the same base name (e.g. `me
 - **Add new property** – Insert a new key with optional positional placement
 - **Propagate value** – Copy a value across all locale files from the context menu
 - **Show only incomplete** – Filter the tree to show only untranslated properties
+- **AI translation** – Generate missing translations for the selected key, or for the whole bundle at once, via any OpenAI compatible endpoint (see below)
+- **Clear translation** – A "x" button next to every translation field removes that translation
+
+### AI Translation
+
+Configure the endpoint under **Settings → Tools → Resource Bundle Editor AI Translation**:
+
+| Setting | Description |
+|---|---|
+| Provider | Presets for LM Studio (`http://localhost:1234/v1`), NanoGPT (`https://nano-gpt.com/api/v1`), OpenAI, or a custom base URL |
+| API key | Stored in the IDE password safe; optional for local servers such as LM Studio |
+| Model | Editable; **Load Models** fetches the list from `/models` |
+| Main language | Preferred translation source, e.g. `de` |
+| Timeout | Per-request timeout in seconds |
+| Parallel requests | 1–16, default 1 (sequential). Higher values speed up bulk translation but may hit rate limits |
+| Additional instructions | Extra prompt text, e.g. domain context or a glossary |
+
+**Test Connection** queries `/models` and sends a tiny chat request with the selected model, reporting success or the server's error.
+
+Use the toolbar above the translation fields (or the context menu of a field):
+
+- **Translate Missing with AI** – translates the selected key into every locale where it has no value.
+- **Translate All Missing in Bundle with AI** – does this for all keys of the bundle after a confirmation showing the number of requests.
+
+The source text is taken from the main language file if it has a value, otherwise from the default file, otherwise from any file with a value. Example: DE and EN exist, main language is DE, so PL and NL are translated from DE. The default file is never a target, since its language is unknown. Placeholders such as `{0}` or `%s` are kept. Results are written in a single undoable step; if a request fails or you cancel, translations received so far are kept.
 
 ---
 
