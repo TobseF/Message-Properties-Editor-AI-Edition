@@ -398,7 +398,8 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
 
   private void applyTranslations(@NotNull List<TranslatedValue> translations) {
     if (translations.isEmpty() || !isValid() || !myResourceBundle.isValid()) return;
-    PsiFile[] filesToPrepare = translations.stream().map(t -> t.file().getContainingFile()).distinct().toArray(PsiFile[]::new);
+    PsiFile[] filesToPrepare = ReadAction.compute(
+      () -> translations.stream().map(t -> t.file().getContainingFile()).distinct().toArray(PsiFile[]::new));
     if (!FileModificationService.getInstance().preparePsiElementsForWrite(filesToPrepare)) return;
     WriteCommandAction.runWriteCommandAction(myProject, ResourceBundleEditorBundle.message("ai.translate.command.name"), null, () -> {
       for (TranslatedValue t : translations) {
@@ -587,7 +588,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
    */
   private void clearTranslation(final @NotNull PropertiesFile propertiesFile, final @NotNull Editor editor) {
     final String key = getSelectedPropertyName();
-    if (key == null || !propertiesFile.getContainingFile().isValid()) return;
+    if (key == null || !ReadAction.compute(() -> propertiesFile.getContainingFile().isValid())) return;
     final VirtualFile file = propertiesFile.getVirtualFile();
     if (!FileModificationService.getInstance().prepareVirtualFilesForWrite(myProject, Collections.singleton(file))) return;
     // otherwise the focus-lost handler would write the old / empty text back
@@ -619,7 +620,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     }, VALUES);
     myValuesPanel.add(myNoPropertySelectedPanel, NO_PROPERTY_SELECTED);
 
-    final List<PropertiesFile> propertiesFiles = myResourceBundle.getPropertiesFiles();
+    final List<PropertiesFile> propertiesFiles = ReadAction.compute(() -> myResourceBundle.getPropertiesFiles());
 
     GridBagConstraints gc = new GridBagConstraints(0, 0, 0, 0, 0, 0, GridBagConstraints.NORTHWEST, GridBagConstraints.BOTH,
                                                    JBUI.insets(5), 0, 0);
@@ -662,7 +663,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
 
         @Override
         public void focusLost(final @NotNull Editor editor) {
-          if (!editor.isViewer() && propertiesFile.getContainingFile().isValid()) {
+          if (!editor.isViewer() && ReadAction.compute(() -> propertiesFile.getContainingFile().isValid())) {
             writeEditorPropertyValue(null, editor, propertiesFile.getVirtualFile());
             myVfsListener.flush();
           }
@@ -676,7 +677,7 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
       gc.weighty = 1;
       gc.anchor = GridBagConstraints.CENTER;
 
-      String title = propertiesFile.getName() + PropertiesUtil.getPresentableLocale(propertiesFile.getLocale());
+      String title = ReadAction.compute(() -> propertiesFile.getName() + PropertiesUtil.getPresentableLocale(propertiesFile.getLocale()));
       JPanel comp = new JPanel(new BorderLayout()) {
         @Override
         public Dimension getPreferredSize() {
@@ -731,18 +732,29 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     if (propertyName == null) return;
 
     final UndoManagerImpl undoManager = (UndoManagerImpl)UndoManager.getInstance(myProject);
-    for (final PropertiesFile propertiesFile : myResourceBundle.getPropertiesFiles()) {
-      final EditorEx editor = myEditors.get(propertiesFile.getVirtualFile());
+    // PSI is only read under a read action; the documents are updated afterwards in separate write actions
+    record FileValue(VirtualFile file, boolean exists, String value) {}
+    final String key = propertyName;
+    final List<FileValue> values = ReadAction.compute(() -> {
+      List<FileValue> result = new ArrayList<>();
+      for (final PropertiesFile propertiesFile : myResourceBundle.getPropertiesFiles()) {
+        final IProperty property = propertiesFile.findPropertyByKey(key);
+        result.add(new FileValue(propertiesFile.getVirtualFile(), property != null, getPropertyEditorValue(property)));
+      }
+      return result;
+    });
+    for (final FileValue fileValue : values) {
+      final EditorEx editor = myEditors.get(fileValue.file());
       if (editor == null) continue;
-      final IProperty property = propertiesFile.findPropertyByKey(propertyName);
       final Document document = editor.getDocument();
       CommandProcessor.getInstance().executeCommand(null, () -> ApplicationManager.getApplication().runWriteAction(() -> {
         if (!checkIsUnderUndoRedoAction || !undoManager.isActive() || !undoManager.isUndoOrRedoInProgress()) {
-          updateDocumentFromPropertyValue(getPropertyEditorValue(property), document);
+          updateDocumentFromPropertyValue(fileValue.value(), document);
         }
       }), "", this);
-      JPanel titledPanel = myTitledPanels.get(propertiesFile.getVirtualFile());
-      ((TitledBorder)titledPanel.getBorder()).setTitleColor(property == null ? JBColor.RED : UIUtil.getLabelTextForeground());
+      JPanel titledPanel = myTitledPanels.get(fileValue.file());
+      if (titledPanel == null) continue;
+      ((TitledBorder)titledPanel.getBorder()).setTitleColor(fileValue.exists() ? UIUtil.getLabelTextForeground() : JBColor.RED);
       titledPanel.repaint();
     }
   }
@@ -865,11 +877,11 @@ public final class ResourceBundleEditor extends UserDataHolderBase implements Do
     final int idx = keysOrder.indexOf(currentKey);
     LOG.assertTrue(idx != -1);
     final IncompletePropertyInspection incompletePropertyInspection =
-      IncompletePropertyInspection.getInstance(myResourceBundle.getDefaultPropertiesFile().getContainingFile());
+      ReadAction.compute(() -> IncompletePropertyInspection.getInstance(myResourceBundle.getDefaultPropertiesFile().getContainingFile()));
     for (int i = 1; i < keysOrder.size(); i++) {
       int trimmedIndex = (i + idx) % keysOrder.size();
       final String key = keysOrder.get(trimmedIndex);
-      if (!incompletePropertyInspection.isPropertyComplete(key, myResourceBundle)) {
+      if (!ReadAction.compute(() -> incompletePropertyInspection.isPropertyComplete(key, myResourceBundle))) {
         selectProperty(key);
         return;
       }
