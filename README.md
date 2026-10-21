@@ -1,4 +1,4 @@
-# <img alt="SVGPaw" src="docs/icon.svg" height="48"/> Message Properties Editor AI Edition
+# <img alt="SVGPaw" src="/docs/icon.svg" height="48"/> Message Properties Editor AI Edition
 
 **The Resource Bundle Editor you know, now with AI translations built in.**
 
@@ -18,6 +18,9 @@ Open the bundle, see every locale side by side, and fill the gaps with one click
 
 **Plugin ID:** `github.tobsef.message.properties.editor.ai`
 
+[Plugin-Site]: https://plugins.jetbrains.com/plugin/35324-message-properties-editor-ai-edition
+
+[<img alt="Plugin-Site Link" height="48px" src="docs/jetbtains_marketplace.svg"/>][Plugin-Site]
 ---
 
 ## Features
